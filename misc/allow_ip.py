@@ -40,7 +40,8 @@ class AllowedIP:
 
         ret_value = False
 
-        self.read_file(logger)  # Подгружаем данные из файла
+        if not self.allow_ip:
+            self.read_file(logger)  # Подгружаем данные из файла
 
         if user_ip in self.allow_ip:
             if self.allow_ip[user_ip] >= activity_lvl:

@@ -35,7 +35,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
     logger.add_log(f"SUCCESS\tweb_flask\tСервер WEB_RUM_Flask начал свою работу")  # log
 
-    cam_list = create_cams_threads(set_ini['CAMERAS'])
+    cam_list = create_cams_threads(set_ini['CAMERAS'], logger)
 
     # IP FUNCTION
 
@@ -91,7 +91,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
             try:
                 # Команда на запись кадра в файл
-                valid_frame = cam_list[cam_name].create_frame()
+                valid_frame = cam_list[cam_name].create_frame(logger)
                 # Получить кадр
                 frame = cam_list[cam_name].take_frame(valid_frame)
             except Exception as ex:
@@ -122,7 +122,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
             # cam_name = str(res_request.get('cam_name'))
             cam_name = str(res_request.get('name'))
 
-            cam_list[cam_name].start()
+            cam_list[cam_name].start(logger)
 
             json_replay['RESULT'] = "SUCCESS"
 

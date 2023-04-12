@@ -4,6 +4,7 @@ import datetime
 import cv2
 import os
 import threading
+from misc.logger import Logger
 
 
 TH_CAM_ERROR_LOCK = threading.Lock()
@@ -20,6 +21,7 @@ class ThreadVideoRTSP:
         self.th_do_frame_lock = threading.Lock()
 
         self.allow_read_frame = True
+        self.no_exception_in_read_frame = True  # Случай если было исключение в работе с получением кадра
         self.do_frame = False
 
         self.url_frame = f'./temp/frame_{self.cam_name}.jpg'
@@ -27,79 +29,88 @@ class ThreadVideoRTSP:
         self.thread_is_alive = False
         self.thread_object = None
 
-    def start(self):
+    def start(self, logger: Logger):
 
         if not self.thread_is_alive:
             self.allow_read_frame = True
+            self.no_exception_in_read_frame = True
 
-            print(f"EVENT\tПопытка подключиться к камере: {self.cam_name} - {self.url}")
+            logger.add_log(f"EVENT\tПопытка подключиться к камере: {self.cam_name} - {self.url}")
 
-            self.thread_object = threading.Thread(target=self.__start)
-            self.thread_object.start()
-            self.thread_is_alive = True
+            with self.th_do_frame_lock:
+                self.thread_object = threading.Thread(target=self.__start, args=[logger, ])
+                self.thread_object.start()
+                self.thread_is_alive = True
         else:
-            print("WARNING\tНе удалось запустить поток, занят другим делом")
+            logger.add_log(f"WARNING\tНе удалось запустить поток для камеры {self.cam_name} - {self.url}, "
+                           f"занят другим делом.")
 
-    def __start(self):
+    def __start(self, logger: Logger):
         """ Функция подключения и поддержки связи с камерой """
         capture = cv2.VideoCapture(self.url)
 
         if capture.isOpened():
-            print(f"SUCCESS\tThreadVideoRTSP.start()\t"
-                  f"Создано подключение к {self.cam_name} - {self.url}")
+            logger.add_log(f"SUCCESS\tThreadVideoRTSP.start()\t"
+                                f"Создано подключение к {self.cam_name} - {self.url}")
 
         frame_fail_cnt = 0
 
-        while self.allow_read_frame:
+        try:
+            while self.allow_read_frame:
 
-            if not capture.isOpened():
-                break
+                if not capture.isOpened():
+                    break
 
-            ret, frame = capture.read()  # читать всегда кадр
-            # cv2.imshow('frame', frame)
+                ret, frame = capture.read()  # читать всегда кадр
+                # cv2.imshow('frame', frame)
 
-            with self.th_do_frame_lock:
-                if self.do_frame and ret:
-                    # Начинаем сохранять кадр в файл
-                    frame_fail_cnt = 0
+                with self.th_do_frame_lock:
+                    if self.do_frame and ret:
+                        # Начинаем сохранять кадр в файл
+                        frame_fail_cnt = 0
 
-                    # cv2.imwrite(self.url_frame, frame)
+                        # cv2.imwrite(self.url_frame, frame)
 
-                    ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
+                        ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
 
-                    if ret_jpg:
-                        # Сохраняем кадр в переменную
-                        self.last_frame = frame_jpg.tobytes()
+                        if ret_jpg:
+                            # Сохраняем кадр в переменную
+                            self.last_frame = frame_jpg.tobytes()
 
-                    self.do_frame = False
+                        self.do_frame = False
 
-                elif not ret:
-                    # Собираем статистику неудачных кадров
-                    time.sleep(0.02)
-                    frame_fail_cnt += 1
+                    elif not ret:
+                        # Собираем статистику неудачных кадров
+                        time.sleep(0.02)
+                        frame_fail_cnt += 1
 
-                    # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
-                    if frame_fail_cnt == 50:
-                        print(f"WARNING\tThreadVideoRTSP.start()\t"
-                              f"{self.cam_name} - Слишком много неудачных кадров, повторное переподключение к камере.")
-                        break
-                else:
-                    frame_fail_cnt = 0
+                        # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
+                        if frame_fail_cnt == 50:
+                            logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
+                                            f"{self.cam_name} - "
+                                           f"Слишком много неудачных кадров, повторное переподключение к камере.")
+                            break
+                    else:
+                        frame_fail_cnt = 0
+        except Exception as ex:
+            logger.add_log(f"EXCEPTION\tThreadVideoRTSP.__start\t"
+                           f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
+            self.no_exception_in_read_frame = False
 
-        print(f"WARNING\tThreadVideoRTSP.start()\t"
-              f"{self.cam_name} - Камера отключена: {self.url}")
+        logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
+                        f"{self.cam_name} - Камера отключена: {self.url}")
         self.thread_is_alive = False
 
         try:
             # Освобождаем
             capture.release()
         except Exception as ex:
-            print(f"EXCEPTION\tThreadVideoRTSP.start()\t"
-                  f"{self.cam_name} - Исключение вызвал метод освобождения capture.release(): {ex}")
+            logger.add_log(f"EXCEPTION\tThreadVideoRTSP.start()\t"
+                            f"{self.cam_name} - Исключение вызвал метод освобождения capture.release(): {ex}")
 
         # Если разрешено чтение кадров переподключаем камеру
         if self.allow_read_frame:
-            self.start()
+            self.start(logger)
         # cv2.destroyAllWindows()
 
     def stop(self):
@@ -122,12 +133,21 @@ class ThreadVideoRTSP:
 
         return frame
 
-    def create_frame(self):
+    def create_frame(self, logger: Logger):
         """ Функция задает флаг на создание кадра в файл """
         ret_value = True
 
-        with self.th_do_frame_lock:
-            self.do_frame = True
+        try:
+            with self.th_do_frame_lock:
+
+                if self.thread_object.is_alive:
+                    self.do_frame = True
+                else:
+                    self.thread_is_alive = False
+                    self.start(logger)
+
+        except Exception as ex:
+            logger.add_log(f"EXCEPTION\tThreadVideoRTSP.create_frame\tИсключение вызвала попытка проверить поток: {ex}")
 
         wait_time = 0
 
@@ -147,12 +167,12 @@ class ThreadVideoRTSP:
         return ret_value
 
 
-def create_cams_threads(cams_from_settings: dict) -> dict:
+def create_cams_threads(cams_from_settings: dict, logger: Logger) -> dict:
     """ Функция создает словарь с объектами класса ThreadVideoRTSP и запускает от их имени потоки """
     cameras = dict()
 
     for key in cams_from_settings:
         cameras[key] = ThreadVideoRTSP(str(key), cams_from_settings[key])
-        cameras[key].start()
+        cameras[key].start(logger)
 
     return cameras
