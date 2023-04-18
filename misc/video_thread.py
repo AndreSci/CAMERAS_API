@@ -1,18 +1,32 @@
 import time
 import datetime
+import argparse
 
 import cv2
 import os
 import threading
 from misc.logger import Logger
+from misc.ai import AiClass
 
 
 TH_CAM_ERROR_LOCK = threading.Lock()
 
 
+def parse_arguments() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="YOLOv8 live")
+    parser.add_argument(
+        "--webcam-resolution",
+        default=[640, 384],
+        nargs=2,
+        type=int
+    )
+    args = parser.parse_args()
+    return args
+
+
 class ThreadVideoRTSP:
     """ Класс получения видео из камеры"""
-    def __init__(self, cam_name: str, url: str):
+    def __init__(self, cam_name: str, url: str, plate_recon: AiClass):
         self.url = url
         self.cam_name = cam_name
 
@@ -28,6 +42,8 @@ class ThreadVideoRTSP:
 
         self.thread_is_alive = False
         self.thread_object = None
+
+        self.plate_recon = plate_recon
 
     def start(self, logger: Logger):
 
@@ -47,6 +63,7 @@ class ThreadVideoRTSP:
 
     def __start(self, logger: Logger):
         """ Функция подключения и поддержки связи с камерой """
+
         capture = cv2.VideoCapture(self.url)
 
         if capture.isOpened():
@@ -62,7 +79,6 @@ class ThreadVideoRTSP:
                     break
 
                 ret, frame = capture.read()  # читать всегда кадр
-                # cv2.imshow('frame', frame)
 
                 with self.th_do_frame_lock:
                     if self.do_frame and ret:
@@ -70,7 +86,10 @@ class ThreadVideoRTSP:
                         frame_fail_cnt = 0
 
                         # cv2.imwrite(self.url_frame, frame)
+                        # Дорисовываем квадрат на кадре
+                        self.plate_recon.find_plate(frame)
 
+                        # Преобразуем кадр в .jpg
                         ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
 
                         if ret_jpg:
@@ -167,12 +186,12 @@ class ThreadVideoRTSP:
         return ret_value
 
 
-def create_cams_threads(cams_from_settings: dict, logger: Logger) -> dict:
+def create_cams_threads(cams_from_settings: dict, logger: Logger, plate_recon: AiClass) -> dict:
     """ Функция создает словарь с объектами класса ThreadVideoRTSP и запускает от их имени потоки """
     cameras = dict()
 
     for key in cams_from_settings:
-        cameras[key] = ThreadVideoRTSP(str(key), cams_from_settings[key])
+        cameras[key] = ThreadVideoRTSP(str(key), cams_from_settings[key], plate_recon)
         cameras[key].start(logger)
 
     return cameras

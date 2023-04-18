@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify, Response
 from misc.logger import Logger
 from misc.utility import SettingsIni
 from misc.allow_ip import AllowedIP
+from misc.ai import AiClass
 
 import logging
 
@@ -35,7 +36,10 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
     logger.add_log(f"SUCCESS\tweb_flask\tСервер WEB_RUM_Flask начал свою работу")  # log
 
-    cam_list = create_cams_threads(set_ini['CAMERAS'], logger)
+    # Создаем объект для поиска номера на кадре
+    plate_recon = AiClass()
+
+    cam_list = create_cams_threads(set_ini['CAMERAS'], logger, plate_recon)
 
     # IP FUNCTION
 
