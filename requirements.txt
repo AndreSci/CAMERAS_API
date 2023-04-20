@@ -7,3 +7,5 @@ yolov5~=7.0.11
 supervision~=0.5.2
 numpy~=1.24.2
 ultralytics~=8.0.75
+
+onnxruntime-gpu==1.14.1

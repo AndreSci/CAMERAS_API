@@ -20,3 +20,7 @@ functools
 
 OpenCV версия
 pip install opencv-python==4.5.5.64
+
+
+PyTorch 2.0 + cuda 18
+pip install numpy --pre torch torchvision torchaudio --force-reinstall --index-url https://download.pytorch.org/whl/nightly/cu118

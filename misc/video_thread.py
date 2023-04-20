@@ -12,18 +12,6 @@ from misc.ai import AiClass
 TH_CAM_ERROR_LOCK = threading.Lock()
 
 
-def parse_arguments() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="YOLOv8 live")
-    parser.add_argument(
-        "--webcam-resolution",
-        default=[640, 384],
-        nargs=2,
-        type=int
-    )
-    args = parser.parse_args()
-    return args
-
-
 class ThreadVideoRTSP:
     """ Класс получения видео из камеры"""
     def __init__(self, cam_name: str, url: str, plate_recon: AiClass):
@@ -89,11 +77,13 @@ class ThreadVideoRTSP:
                         # Дорисовываем квадрат на кадре
                         self.plate_recon.find_plate(frame)
 
+                        frame = cv2.resize(frame, (0, 0), fx=0.9, fy=0.9)
                         # Преобразуем кадр в .jpg
                         ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
 
                         if ret_jpg:
                             # Сохраняем кадр в переменную
+
                             self.last_frame = frame_jpg.tobytes()
 
                         self.do_frame = False
