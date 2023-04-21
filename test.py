@@ -189,5 +189,39 @@ def main2():
     cv2.imwrite('./test_im.jpg', frame)
 
 
+def main3():
+    from misc.ai import AiClass
+
+    ai_class = AiClass()
+    #
+    # args = parse_arguments()
+    # frame_width, frame_height = args.webcam_resolution
+
+    capture = cv2.VideoCapture('test_vid.mp4')
+    # capture.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
+    # capture.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+
+    index = 5
+
+    while True:
+
+        if not capture.isOpened():
+            break
+
+        ret, frame = capture.read()  # читать всегда кадр
+
+        if ret:
+            index = 0
+            ai_class.find_plate(frame)
+
+        cv2.imshow("yolov5", frame)
+        index += 1
+
+        if (cv2.waitKey(30) == 27):
+            break
+
+    cv2.destroyAllWindows()
+
+
 if __name__ == "__main__":
-    main2()
+    main3()
