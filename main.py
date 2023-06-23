@@ -1,11 +1,9 @@
-from misc.video_thread import ThreadVideoRTSP
 from misc.video_thread import create_cams_threads
 from flask import Flask, request, jsonify, Response
 
 from misc.logger import Logger
 from misc.utility import SettingsIni
 from misc.allow_ip import AllowedIP
-from misc.ai import AiClass
 
 import logging
 
@@ -34,12 +32,9 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     allow_ip = AllowedIP()
     allow_ip.read_file(logger)
 
-    logger.add_log(f"SUCCESS\tweb_flask\tСервер WEB_RUM_Flask начал свою работу")  # log
+    logger.add_log(f"SUCCESS\tweb_flask\tСервер CAM_API_Flask начал свою работу")  # log
 
-    # Создаем объект для поиска номера на кадре
-    plate_recon = AiClass()
-
-    cam_list = create_cams_threads(set_ini['CAMERAS'], logger, plate_recon)
+    cam_list = create_cams_threads(set_ini['CAMERAS'], logger)
 
     # IP FUNCTION
 
@@ -95,7 +90,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
             try:
                 # Команда на запись кадра в файл
-                valid_frame = cam_list[cam_name].create_frame(logger)
+                valid_frame = cam_list[cam_name].create_frame()
                 # Получить кадр
                 frame = cam_list[cam_name].take_frame(valid_frame)
             except Exception as ex:
@@ -103,59 +98,6 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
                 logger.add_log(f"EXCEPTION\ttake_frame()\tНе удалось получить кадр из камеры: {ex}")
 
             return Response(frame, mimetype='image/jpeg')
-
-        return jsonify(json_replay)
-
-    @app.route('/start.cam', methods=['GET'])
-    def start_cam():
-        """ Включает получение видео потока от указанной каменры """
-
-        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": ""}
-
-        user_ip = request.remote_addr
-        logger.add_log(f"EVENT\tstart_cam()\tзапрос от ip: {user_ip}", print_it=False)
-
-        # Проверяем разрешён ли доступ для IP
-        if not allow_ip.find_ip(user_ip, logger):
-            json_replay["DESC"] = ERROR_ACCESS_IP
-            logger.add_log(f"WARNING\tstart_cam()\tОшибка доступа по ip: {user_ip}, ip не имеет разрешения.")
-        else:
-            # получаем данные из параметров запроса
-            res_request = request.args
-
-            # cam_name = str(res_request.get('cam_name'))
-            cam_name = str(res_request.get('name'))
-
-            cam_list[cam_name].start(logger)
-
-            json_replay['RESULT'] = "SUCCESS"
-
-        return jsonify(json_replay)
-
-    @app.route('/stop.cam', methods=['GET'])
-    def stop_cam():
-        """ Удаляет заявку на создание пропуска если FStatusID = 1 \n
-        принимает user_id, inn и fid заявки """
-
-        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": ""}
-
-        user_ip = request.remote_addr
-        logger.add_log(f"EVENT\tstop_cam()\tзапрос от ip: {user_ip}", print_it=False)
-
-        # Проверяем разрешён ли доступ для IP
-        if not allow_ip.find_ip(user_ip, logger):
-            json_replay["DESC"] = ERROR_ACCESS_IP
-            logger.add_log(f"WARNING\tstop_cam()\tОшибка доступа по ip: {user_ip}, ip не имеет разрешения.")
-        else:
-            # получаем данные из параметров запроса
-            res_request = request.args
-
-            # cam_name = str(res_request.get('cam_name'))
-            cam_name = str(res_request.get('name'))
-
-            cam_list[cam_name].stop()
-
-            json_replay['RESULT'] = "SUCCESS"
 
         return jsonify(json_replay)
 
