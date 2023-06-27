@@ -9,6 +9,20 @@ from misc.logger import Logger
 TH_CAM_ERROR_LOCK = threading.Lock()
 
 
+class AllowReadFrame:
+    def __init__(self):
+        self.allow_read_frame = False
+        self.lock = threading.Lock()
+
+    def get(self) -> bool:
+        with self.lock:
+            return self.allow_read_frame
+
+    def set(self, val: bool) -> None:
+        with self.lock:
+            self.allow_read_frame = val
+
+
 class ThreadVideoRTSP:
     """ Класс получения видео из камеры"""
     def __init__(self, cam_name: str, url: str):
@@ -20,19 +34,25 @@ class ThreadVideoRTSP:
 
         self.th_do_frame_lock = threading.Lock()
 
-        self.allow_read_frame = True
-        self.do_frame = False
+        self.allow_read_frame = AllowReadFrame()
+        self.allow_read_cam = True
+        self.do_frame = AllowReadFrame()
 
         self.thread_is_alive = False
-        self.thread_object = None
+        self.thread_object = threading.Thread
+
+        self.miss_frame_index = 0
+
+        # FPS = 1/X
+        # X = desired FPS
+        self.FPS = 1/30
+        self.FPS_MS = int(self.FPS * 1000)
 
     def start(self, logger: Logger):
         # Если поток имеет флаг False создаем новый
         self.load_no_signal_pic()
 
         if not self.thread_is_alive:
-            self.allow_read_frame = True
-
             with self.th_do_frame_lock:
                 self.thread_is_alive = True
                 self.thread_object = threading.Thread(target=self.__start, args=[logger, ], daemon=True)
@@ -44,59 +64,64 @@ class ThreadVideoRTSP:
     def __start(self, logger: Logger):
         """ Функция подключения и поддержки связи с камерой """
 
-        while self.allow_read_frame:
-            logger.add_log(f"EVENT\tПопытка подключиться к камере: {self.cam_name} - {self.url}")
+        while self.allow_read_cam:
+            self.allow_read_frame.set(False)
+            logger.add_log(f"EVENT\tThreadVideoRTSP.start()1\t"
+                           f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
             capture = cv2.VideoCapture(self.url)
+            capture.set(cv2.CAP_PROP_BUFFERSIZE, 4)
 
             if capture.isOpened():
-                logger.add_log(f"SUCCESS\tThreadVideoRTSP.start()\t"
+                self.allow_read_frame.set(True)
+                logger.add_log(f"SUCCESS\tThreadVideoRTSP.start()2\t"
                                     f"Создано подключение к {self.cam_name} - {self.url}")
 
             frame_fail_cnt = 0
 
             try:
-                while self.allow_read_frame:
+                while self.allow_read_frame.get():
 
-                    if not capture.isOpened():
-                        break
+                    if capture.isOpened():
+                        ret, frame = capture.read()  # читать всегда кадр
+                        # cv2.imshow(self.cam_name, frame)
+                        # cv2.waitKey(20)
 
-                    ret, frame = capture.read()  # читать всегда кадр
-                    # cv2.imshow(self.cam_name, frame)
-                    # cv2.waitKey(20)
+                        with self.th_do_frame_lock:
+                            if self.do_frame.get() and ret:
+                                # Начинаем сохранять кадр в файл
+                                frame_fail_cnt = 0
 
-                    with self.th_do_frame_lock:
-                        if self.do_frame and ret:
-                            # Начинаем сохранять кадр в файл
-                            frame_fail_cnt = 0
+                                # cv2.imwrite(self.url_frame, frame)
 
-                            # cv2.imwrite(self.url_frame, frame)
+                                ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
 
-                            ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
+                                if ret_jpg:
+                                    # Сохраняем кадр в переменную
+                                    self.last_frame = frame_jpg.tobytes()
 
-                            if ret_jpg:
-                                # Сохраняем кадр в переменную
-                                self.last_frame = frame_jpg.tobytes()
+                                self.do_frame.set(False)
 
-                            self.do_frame = False
+                            elif not ret:
+                                # Собираем статистику неудачных кадров
+                                time.sleep(0.02)
+                                frame_fail_cnt += 1
 
-                        elif not ret:
-                            # Собираем статистику неудачных кадров
-                            time.sleep(0.02)
-                            frame_fail_cnt += 1
+                                # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
+                                if frame_fail_cnt == 50:
+                                    logger.add_log(f"WARNING\tThreadVideoRTSP.start()3\t"
+                                                    f"{self.cam_name} - "
+                                                   f"Слишком много неудачных кадров, повторное подключение к камере.")
+                                    break
+                            else:
+                                frame_fail_cnt = 0
 
-                            # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
-                            if frame_fail_cnt == 50:
-                                logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
-                                                f"{self.cam_name} - "
-                                               f"Слишком много неудачных кадров, повторное подключение к камере.")
-                                break
-                        else:
-                            frame_fail_cnt = 0
+                    time.sleep(self.FPS)
+
             except Exception as ex:
-                logger.add_log(f"EXCEPTION\tThreadVideoRTSP.__start\t"
+                logger.add_log(f"EXCEPTION\tThreadVideoRTSP.start()4\t"
                                f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
 
-            logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
+            logger.add_log(f"WARNING\tThreadVideoRTSP.start()5\t"
                             f"{self.cam_name} - Камера отключена: {self.url}")
 
             capture.release()
@@ -113,24 +138,35 @@ class ThreadVideoRTSP:
             with self.th_do_frame_lock:
                 return copy.copy(self.last_frame)
         else:
+            # Добавляем в счетчик неудачных кадров
+            self.miss_frame_index += 1
+            # Если счетчик неудачных кадров дошел до заданного значение блокируем чтение кадров
+            if self.miss_frame_index == 100:
+                self.allow_read_frame.set(False)
+
             return self.no_frame
 
-    def create_frame(self):
+    def create_frame(self, logger: Logger):
         """ Функция задает флаг на создание кадра в файл """
         ret_value = True
 
         with self.th_do_frame_lock:
-            self.do_frame = True
+            self.do_frame.set(True)
 
         wait_time = 0
+
+        if not self.thread_object.is_alive:
+            logger.add_log(f"ERROR\tThreadVideoRTSP.create_frame()1\t"
+                           f"Поток обработки кадров для {self.cam_name} не найден.")
+            self.start(logger)
 
         # Цикл ожидает пока поток __start() изменит self.do_frame на False
         while True:
 
             with self.th_do_frame_lock:  # Блокируем потоки
-                if not self.do_frame:
+                if not self.do_frame.get():
                     break
-                elif wait_time == 10:  # Счетчик
+                elif wait_time == 14:  # Счетчик
                     ret_value = False
                     break
 
