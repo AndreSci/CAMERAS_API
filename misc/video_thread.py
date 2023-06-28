@@ -9,7 +9,7 @@ from misc.logger import Logger
 TH_CAM_ERROR_LOCK = threading.Lock()
 
 
-class AllowReadFrame:
+class ThreadAccessControl:
     def __init__(self):
         self.allow_read_frame = False
         self.lock = threading.Lock()
@@ -34,9 +34,9 @@ class ThreadVideoRTSP:
 
         self.th_do_frame_lock = threading.Lock()
 
-        self.allow_read_frame = AllowReadFrame()
+        self.allow_read_frame = ThreadAccessControl()
         self.allow_read_cam = True
-        self.do_frame = AllowReadFrame()
+        self.do_frame = ThreadAccessControl()
 
         self.thread_is_alive = False
         self.thread_object = threading.Thread
@@ -86,34 +86,34 @@ class ThreadVideoRTSP:
                         # cv2.imshow(self.cam_name, frame)
                         # cv2.waitKey(20)
 
-                        with self.th_do_frame_lock:
-                            if self.do_frame.get() and ret:
-                                # Начинаем сохранять кадр в файл
-                                frame_fail_cnt = 0
+                        if self.do_frame.get() and ret:
+                            # Начинаем сохранять кадр в файл
+                            frame_fail_cnt = 0
 
-                                # cv2.imwrite(self.url_frame, frame)
+                            # cv2.imwrite(self.url_frame, frame)
 
-                                ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
+                            ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
 
-                                if ret_jpg:
-                                    # Сохраняем кадр в переменную
+                            if ret_jpg:
+                                # Сохраняем кадр в переменную
+                                with self.th_do_frame_lock:
                                     self.last_frame = frame_jpg.tobytes()
 
-                                self.do_frame.set(False)
+                            self.do_frame.set(False)
 
-                            elif not ret:
-                                # Собираем статистику неудачных кадров
-                                time.sleep(0.02)
-                                frame_fail_cnt += 1
+                        elif not ret:
+                            # Собираем статистику неудачных кадров
+                            time.sleep(0.02)
+                            frame_fail_cnt += 1
 
-                                # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
-                                if frame_fail_cnt == 50:
-                                    logger.add_log(f"WARNING\tThreadVideoRTSP.start()3\t"
-                                                    f"{self.cam_name} - "
-                                                   f"Слишком много неудачных кадров, повторное подключение к камере.")
-                                    break
-                            else:
-                                frame_fail_cnt = 0
+                            # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
+                            if frame_fail_cnt == 50:
+                                logger.add_log(f"WARNING\tThreadVideoRTSP.start()3\t"
+                                                f"{self.cam_name} - "
+                                               f"Слишком много неудачных кадров, повторное подключение к камере.")
+                                break
+                        else:
+                            frame_fail_cnt = 0
 
                     time.sleep(self.FPS)
 
@@ -150,25 +150,26 @@ class ThreadVideoRTSP:
         """ Функция задает флаг на создание кадра в файл """
         ret_value = True
 
-        with self.th_do_frame_lock:
-            self.do_frame.set(True)
+        self.do_frame.set(True)
 
         wait_time = 0
 
+        # Проверяем жив ли поток для связи с камерой
         if not self.thread_object.is_alive:
             logger.add_log(f"ERROR\tThreadVideoRTSP.create_frame()1\t"
                            f"Поток обработки кадров для {self.cam_name} не найден.")
             self.start(logger)
 
         # Цикл ожидает пока поток __start() изменит self.do_frame на False
+        # Время ожидание 450 мс. (в среднем получение одного кадра должно быть ~30мс.)
+        # На практике ожидание кадра меньше 450 мс. вызывает частые кадры "NO SINGAL"
         while True:
 
-            with self.th_do_frame_lock:  # Блокируем потоки
-                if not self.do_frame.get():
-                    break
-                elif wait_time == 14:  # Счетчик
-                    ret_value = False
-                    break
+            if not self.do_frame.get():
+                break
+            elif wait_time == 15:  # Счетчик
+                ret_value = False
+                break
 
             time.sleep(0.03)
             wait_time += 1
