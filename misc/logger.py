@@ -1,6 +1,7 @@
 import threading
 import os
 import datetime
+from functools import cache
 
 from misc.utility import SettingsIni
 
@@ -32,8 +33,19 @@ def test_dir(log_path) -> bool:
     return ret_value
 
 
-class Logger:
-    """ Класс вывода данных в консоль и запись в файл """
+class Logger(object):
+    """ Класс вывода данных в консоль и запись в файл\n
+     SINGLETON класс """
+    # # __instance = False
+    #
+    # def __new__(cls, *args, **kwargs):
+    #     if not hasattr(cls, 'instance'):
+    #         cls.instance = super(Logger, cls).__new__(cls, *args, **kwargs)
+    #     # else:
+    #     #     raise Exception("Ошибка повторного создания Singleton")
+    #
+    #     return cls.instance
+
     def __init__(self, class_settings: SettingsIni):
         self.set_ini = class_settings
         self.font_color = False
