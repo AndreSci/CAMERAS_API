@@ -1,7 +1,6 @@
 import threading
 import os
 import datetime
-from functools import cache
 
 from misc.utility import SettingsIni
 

@@ -127,6 +127,7 @@ class ThreadVideoRTSP:
             capture.release()
 
     def load_no_signal_pic(self):
+        """ Функция подгружает кадр с надписью NoSignal """
         with open('./cam_error.jpg', "rb") as file:
             self.no_frame = file.read()
 
