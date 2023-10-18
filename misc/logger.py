@@ -1,8 +1,11 @@
 import threading
 import os
 import datetime
+import inspect
+import traceback
 
-from misc.utility import SettingsIni
+# Данные для logger
+LOGGER_PATH = os.path.join(os.getcwd(), "logs\\")
 
 
 class BColors:
@@ -32,59 +35,90 @@ def test_dir(log_path) -> bool:
     return ret_value
 
 
-class Logger(object):
-    """ Класс вывода данных в консоль и запись в файл\n
-     SINGLETON класс """
-    # # __instance = False
-    #
-    # def __new__(cls, *args, **kwargs):
-    #     if not hasattr(cls, 'instance'):
-    #         cls.instance = super(Logger, cls).__new__(cls, *args, **kwargs)
-    #     # else:
-    #     #     raise Exception("Ошибка повторного создания Singleton")
-    #
-    #     return cls.instance
+class SingletonBaseClass(type):
+    _instances = {}
 
-    def __init__(self, class_settings: SettingsIni):
-        self.set_ini = class_settings
+    def __call__(cls, *args, **kwargs):
+        if cls not in cls._instances:
+            cls._instances[cls] = super(SingletonBaseClass, cls).__call__(*args, **kwargs)
+
+        return cls._instances[cls]
+
+
+class Logger(metaclass=SingletonBaseClass):
+    """ Класс вывода данных в консоль и запись в файл """
+    def __init__(self):
         self.font_color = False
         self.log_guard = threading.Lock()
 
     def add_log(self, text: str, print_it=True):
         """ Обшивает текст датой, табуляцией и переходом на новую строку"""
         ret_value = False
+        try:
+            today = datetime.datetime.today()
 
-        log_path = self.set_ini.take_log_path()
-        today = datetime.datetime.today()
+            for_file_name = str(today.strftime("%Y-%m-%d"))
 
-        for_file_name = str(today.strftime("%Y-%m-%d"))
+            date_time = str(today.strftime("%Y-%m-%d/%H.%M.%S"))
+            # Создаем лог
+            mess = date_time + "\t" + text + "\n"
 
-        date_time = str(today.strftime("%Y-%m-%d/%H.%M.%S"))
-        # Создаем лог
-        mess = date_time + "\t" + text + "\n"
+            if test_dir(LOGGER_PATH):
 
-        if test_dir(log_path):
+                # if LOGGER_PATH[-1] == '\\' or LOGGER_PATH[-1] == '/':
+                #     pass  # Захотелось использовать pass
+                # else:
+                #     log_path = LOGGER_PATH + '/'
 
-            if log_path[-1] == '\\' or log_path[-1] == '/':
-                pass  # Захотелось использовать pass
-            else:
-                log_path = log_path + '/'
+                with self.log_guard:  # Защищаем поток
 
-            with self.log_guard:  # Защищаем поток
+                    # if print_it:
+                    #     print(date_time + "\t" + text)
+                    if print_it:
+                        if 'ERROR' == text[:5]:
+                            print(f"{BColors.col_fail}{date_time}\t{text}{BColors.col_endc}")
+                        elif 'WARNING' == text[:7]:
+                            print(f"{BColors.col_warning}{date_time}\t{text}{BColors.col_endc}")
+                        else:
+                            print(date_time + "\t" + text)
 
-                # if print_it:
-                #     print(date_time + "\t" + text)
-                if print_it:
-                    if 'ERROR' == text[:5]:
-                        print(f"{BColors.col_fail}{date_time}\t{text}{BColors.col_endc}")
-                    elif 'WARNING' == text[:7]:
-                        print(f"{BColors.col_warning}{date_time}\t{text}{BColors.col_endc}")
-                    else:
-                        print(date_time + "\t" + text)
-
-                # Открываем и записываем логи в файл отчета.
-                with open(f'{log_path}{for_file_name}.log', 'a', encoding='utf-8') as file:
-                    file.write(mess)
-                    ret_value = True
+                    # Открываем и записываем логи в файл отчета.
+                    with open(f'{LOGGER_PATH}{for_file_name}.log', 'a', encoding='utf-8') as file:
+                        file.write(mess)
+                        ret_value = True
+        except Exception as ex:
+            print(f"{BColors.col_warning}"
+                  f"EXCEPTION\tLOGGER.add_log\tИсключение в работе регистрации события в файл: {ex}"
+                  f"{BColors.col_endc}")
 
         return ret_value
+
+    def event(self, text: str, print_it=True):
+        # возьми текущий фрейм объект (frame object)
+        current_frame = inspect.currentframe()
+
+        # получи фрейм объект, который его вызвал
+        caller_frame = current_frame.f_back
+
+        # возьми у вызвавшего фрейма исполняемый в нём объект типа "код" (code object)
+        code_obj = caller_frame.f_code
+
+        # и получи его имя
+        code_obj_name = code_obj.co_name
+
+        return self.add_log(f"EVENT\t{code_obj_name}\t{text}", print_it)
+
+    def exception(self, text: str, print_it=True):
+        # возьми текущий фрейм объект (frame object)
+        current_frame = inspect.currentframe()
+
+        # получи фрейм объект, который его вызвал
+        caller_frame = current_frame.f_back
+
+        # возьми у вызвавшего фрейма исполняемый в нём объект типа "код" (code object)
+        code_obj = caller_frame.f_code
+
+        # и получи его имя
+        code_obj_name = code_obj.co_name
+
+        return self.add_log(f"EXCEPTION\t{code_obj_name}\t{text} - {traceback.format_exc()}", print_it)

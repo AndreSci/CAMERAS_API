@@ -12,11 +12,6 @@ ERROR_READ_REQUEST = 'error_read_request'
 ERROR_ON_SERVER = 'server_error'
 
 
-def block_flask_logs():
-    log = logging.getLogger('werkzeug')
-    log.setLevel(logging.ERROR)
-
-
 def web_flask(logger: Logger, settings_ini: SettingsIni):
     """ Главная функция создания сервера Фласк. """
 
@@ -25,7 +20,8 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     app.config['JSON_AS_ASCII'] = False
 
     # Блокируем сообщения фласк
-    block_flask_logs()
+    log = logging.getLogger('werkzeug')
+    log.setLevel(logging.ERROR)
 
     set_ini = settings_ini.take_settings()
 
@@ -67,13 +63,11 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
     @app.route('/action.do', methods=['GET'])
     def take_frame():
-        """ Удаляет заявку на создание пропуска если FStatusID = 1 \n
-        принимает user_id, inn и fid заявки """
+        """ Запрашиваем у потока последний кадр """
 
         json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": ""}
 
         user_ip = request.remote_addr
-        # logger.add_log(f"EVENT\taction.do\tзапрос от ip: {user_ip}", print_it=False)
 
         # Проверяем разрешён ли доступ для IP
         if not allow_ip.find_ip(user_ip, logger):
@@ -84,7 +78,6 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
             # получаем данные из параметров запроса
             res_request = request.args
 
-            # cam_name = str(res_request.get('cam_name'))
             cam_name = str(res_request.get('video_in'))
             cam_name = 'cam' + cam_name[cam_name.find(':') + 1:]
 
