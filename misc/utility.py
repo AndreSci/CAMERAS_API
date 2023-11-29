@@ -23,6 +23,8 @@ class SettingsIni:
                 self.settings_ini["host"] = self.settings_file["GENERAL"]["HOST"]
                 self.settings_ini["port"] = self.settings_file["GENERAL"]["PORT"]
 
+                self.settings_ini['photo_path'] = self.settings_file['PHOTO']['PHOTO_PATH']
+
                 if "LOG_PATH" in self.settings_file["GENERAL"]:
                     self.settings_ini["log_path"] = self.settings_file["GENERAL"]["LOG_PATH"]
                 else:

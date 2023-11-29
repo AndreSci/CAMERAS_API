@@ -23,10 +23,10 @@ def main():
     port = settings.settings_ini["port"]
 
     # Меняем имя терминала
-    ctypes.windll.kernel32.SetConsoleTitleW(f"REST CAM_API port: {port}")
+    ctypes.windll.kernel32.SetConsoleTitleW(f"RTSP - REST CAM_API port: {port}")
 
     # Обьявляем логирование
-    logger = Logger(settings)
+    logger = Logger(settings.take_log_path())
 
     # Запуск сервера фласк
     web_flask(logger, settings)

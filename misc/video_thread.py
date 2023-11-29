@@ -66,14 +66,14 @@ class ThreadVideoRTSP:
 
         while self.allow_read_cam:
             self.allow_read_frame.set(False)
-            logger.add_log(f"EVENT\tThreadVideoRTSP.start()1\t"
+            logger.add_log(f"EVENT\tThreadVideoRTSP.start()\t"
                            f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
             capture = cv2.VideoCapture(self.url)
             capture.set(cv2.CAP_PROP_BUFFERSIZE, 4)
 
             if capture.isOpened():
                 self.allow_read_frame.set(True)
-                logger.add_log(f"SUCCESS\tThreadVideoRTSP.start()2\t"
+                logger.add_log(f"SUCCESS\tThreadVideoRTSP.start()\t"
                                     f"Создано подключение к {self.cam_name} - {self.url}")
 
             frame_fail_cnt = 0
@@ -87,7 +87,7 @@ class ThreadVideoRTSP:
                         # cv2.waitKey(20)
 
                         if self.do_frame.get() and ret:
-                            # Начинаем сохранять кадр в файл
+                            # Начинаем сохранять кадр
                             frame_fail_cnt = 0
 
                             # cv2.imwrite(self.url_frame, frame)
@@ -108,7 +108,7 @@ class ThreadVideoRTSP:
 
                             # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
                             if frame_fail_cnt == 50:
-                                logger.add_log(f"WARNING\tThreadVideoRTSP.start()3\t"
+                                logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
                                                 f"{self.cam_name} - "
                                                f"Слишком много неудачных кадров, повторное подключение к камере.")
                                 break
@@ -118,10 +118,10 @@ class ThreadVideoRTSP:
                     time.sleep(self.FPS)
 
             except Exception as ex:
-                logger.add_log(f"EXCEPTION\tThreadVideoRTSP.start()4\t"
+                logger.add_log(f"EXCEPTION\tThreadVideoRTSP.start()\t"
                                f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
 
-            logger.add_log(f"WARNING\tThreadVideoRTSP.start()5\t"
+            logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
                             f"{self.cam_name} - Камера отключена: {self.url}")
 
             capture.release()
@@ -131,7 +131,7 @@ class ThreadVideoRTSP:
         with open('./cam_error.jpg', "rb") as file:
             self.no_frame = file.read()
 
-    def take_frame(self, valid_frame: bool):
+    def take_frame(self, valid_frame: bool) -> bytes:
         """ Функция выгружает байт-код кадра из файла """
         global TH_CAM_ERROR_LOCK
 
@@ -148,7 +148,7 @@ class ThreadVideoRTSP:
             return self.no_frame
 
     def create_frame(self, logger: Logger):
-        """ Функция задает флаг на создание кадра в файл """
+        """ Функция задает флаг на создание кадра """
         ret_value = True
 
         self.do_frame.set(True)
