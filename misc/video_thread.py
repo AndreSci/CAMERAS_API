@@ -69,7 +69,7 @@ class ThreadVideoRTSP:
             logger.add_log(f"EVENT\tThreadVideoRTSP.start()\t"
                            f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
             capture = cv2.VideoCapture(self.url)
-            capture.set(cv2.CAP_PROP_BUFFERSIZE, 4)
+            capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             if capture.isOpened():
                 self.allow_read_frame.set(True)
@@ -103,11 +103,11 @@ class ThreadVideoRTSP:
 
                         elif not ret:
                             # Собираем статистику неудачных кадров
-                            time.sleep(0.02)
+                            time.sleep(0.001)
                             frame_fail_cnt += 1
 
                             # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
-                            if frame_fail_cnt == 50:
+                            if frame_fail_cnt == 150:
                                 logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
                                                 f"{self.cam_name} - "
                                                f"Слишком много неудачных кадров, повторное подключение к камере.")
