@@ -7,6 +7,7 @@ from misc.utility import SettingsIni
 from misc.allow_ip import AllowedIP
 
 from database.add_event import EventDB
+from database.cameras import CamerasDB
 
 import logging
 
@@ -26,7 +27,12 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     log = logging.getLogger('werkzeug')
     log.setLevel(logging.ERROR)
 
+    # Получаем настройки
     set_ini = settings_ini.take_settings()
+
+    if set_ini['cameras_from_db'] == '1':
+        res = CamerasDB.take_cameras()
+        set_ini['CAMERAS'] = res.get('DATA')
 
     allow_ip = AllowedIP()
     allow_ip.read_file(logger)
@@ -101,48 +107,50 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     def save_frame_asterisk():
         """ Запрашиваем у потока последний кадр и сохраняем его в папку согласно настройкам settings.ini """
 
-        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": ""}
+        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": list()}
 
         user_ip = request.remote_addr
-        logger.event(f"Обращение к rtsp от адреса {user_ip}")
-        # Проверяем разрешён ли доступ для IP
-        # if not allow_ip.find_ip(user_ip, logger):
-        #     json_replay["DESC"] = ERROR_ACCESS_IP
-        #
-        #     logger.warning(f"Ошибка доступа по ip: {user_ip}, ip не имеет разрешения.")
-        # else:
+
         # получаем данные из параметров запроса
         res_request = request.args
         # print(res_request)
-        cam_name = str(res_request.get('cam_number'))
-        cam_name = 'cam' + cam_name[cam_name.find(':') + 1:]
+        answer_id = str(res_request.get('answer_id'))
         caller_id = str(res_request.get('caller_id'))
 
+        logger.event(f"Обращение к rtsp от адреса {user_ip}. Абонент {caller_id} связался с {answer_id}")
+
+        db_request_cams = CamerasDB.find_camera(caller_id)
+
+        if db_request_cams['RESULT'] != "SUCCESS":
+            logger.error(db_request_cams)
+            return jsonify(db_request_cams)
+
         try:
-            # Команда на запись кадра
-            valid_frame = cam_list[cam_name].create_frame(logger)
-            # Получить кадр
-            frame = cam_list[cam_name].take_frame(valid_frame)
-            # Получаем дату и генерируем полный путь к файлу
-            date_time = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
-            file_name = f"{cam_name}-{caller_id}-{date_time}.jpg"
-            file_path = f"{set_ini['photo_path']}{file_name}"
+            for it in db_request_cams.get('DATA'):
+                # Команда на запись кадра
+                valid_frame = cam_list[it.get('FName')].create_frame(logger)
+                # Получить кадр
+                frame = cam_list[it.get('FName')].take_frame(valid_frame)
+                # Получаем дату и генерируем полный путь к файлу
+                date_time = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
+                file_name = f"{it.get('FName')}-{caller_id}-{date_time}.jpg"
+                file_path = f"{set_ini['photo_path']}{file_name}"
 
-            with open(file_path, 'wb') as file:
-                # Сохраняем кадр в файл
-                file.write(frame)
+                with open(file_path, 'wb') as file:
+                    # Сохраняем кадр в файл
+                    file.write(frame)
 
-            logger.event(f"Успешно создан файл: {file_name}")
+                logger.event(f"Успешно создан файл: {file_name}")
 
-            # Добавляем событие в БД
-            db_add = EventDB.add_photo(caller_id, cam_name, file_name)
+                # Добавляем событие в БД
+                db_add = EventDB.add_photo(caller_id, answer_id, it.get('FName'), file_name)
 
-            if db_add:
-                json_replay['DATA'] = {"file_name": file_name}
-                json_replay["RESULT"] = "SUCCESS"
-            else:
-                logger.warning(f"Не удалось внести данные в БД: {res_request}")
-                json_replay['DESC'] = "Не удалось внести данные в БД"
+                if db_add:
+                    json_replay['DATA'].append({"file_name": file_name})
+                    json_replay["RESULT"] = "SUCCESS"
+                else:
+                    logger.warning(f"Не удалось внести данные в БД: {res_request}")
+                    json_replay['DESC'] = json_replay['DESC'] + f"Не удалось внести данные в БД: {file_name}."
 
         except Exception as ex:
             logger.exception(f"Не удалось получить/сохранить кадр из камеры: {ex}")

@@ -22,6 +22,7 @@ class SettingsIni:
                 # general settings ----------------------------------------
                 self.settings_ini["host"] = self.settings_file["GENERAL"]["HOST"]
                 self.settings_ini["port"] = self.settings_file["GENERAL"]["PORT"]
+                self.settings_ini['cameras_from_db'] = self.settings_file['GENERAL']['CAMERAS_FROM_DB']
 
                 self.settings_ini['photo_path'] = self.settings_file['PHOTO']['PHOTO_PATH']
 
@@ -30,7 +31,8 @@ class SettingsIni:
                 else:
                     self.settings_ini["log_path"] = './logs/'
 
-                self.settings_ini['CAMERAS'] = self.settings_file["CAMERAS"]
+                if self.settings_ini['cameras_from_db'] == '0':
+                    self.settings_ini['CAMERAS'] = self.settings_file["CAMERAS"]
 
                 ret_value["result"] = True
 
