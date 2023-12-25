@@ -1,4 +1,4 @@
-from misc.video_thread import create_cams_threads
+from misc.video_thread import create_cams_threads, ThreadVideoRTSP
 from flask import Flask, request, jsonify, Response
 import datetime
 
@@ -15,9 +15,13 @@ ERROR_ACCESS_IP = 'access_block_ip'
 ERROR_READ_REQUEST = 'error_read_request'
 ERROR_ON_SERVER = 'server_error'
 
+CAM_DICT = dict()
+OLD_CAM_LIST = list()
+
 
 def web_flask(logger: Logger, settings_ini: SettingsIni):
     """ Главная функция создания сервера Фласк. """
+    global CAM_DICT
 
     app = Flask(__name__)  # Объявление сервера
 
@@ -39,7 +43,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
     logger.add_log(f"SUCCESS\tweb_flask\tСервер CAM_API_Flask начал свою работу")  # log
 
-    cam_list = create_cams_threads(set_ini['CAMERAS'], logger)
+    CAM_DICT = create_cams_threads(set_ini['CAMERAS'])
 
     # IP FUNCTION
 
@@ -88,13 +92,13 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
             res_request = request.args
 
             cam_name = str(res_request.get('video_in'))
-            cam_name = 'cam' + cam_name[cam_name.find(':') + 1:]
+            cam_name = 'CAM' + cam_name[cam_name.find(':') + 1:]
 
             try:
                 # Команда на запись кадра в файл
-                valid_frame = cam_list[cam_name].create_frame(logger)
+                valid_frame = CAM_DICT[cam_name].create_frame()
                 # Получить кадр
-                frame = cam_list[cam_name].take_frame(valid_frame)
+                frame = CAM_DICT[cam_name].take_frame(valid_frame)
             except Exception as ex:
                 frame = ''
                 logger.add_log(f"EXCEPTION\ttake_frame()\tНе удалось получить кадр из камеры: {ex}")
@@ -128,9 +132,9 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
         try:
             for it in db_request_cams.get('DATA'):
                 # Команда на запись кадра
-                valid_frame = cam_list[it.get('FName')].create_frame(logger)
+                valid_frame = CAM_DICT[it.get('FName')].create_frame()
                 # Получить кадр
-                frame = cam_list[it.get('FName')].take_frame(valid_frame)
+                frame = CAM_DICT[it.get('FName')].take_frame(valid_frame)
                 # Получаем дату и генерируем полный путь к файлу
                 date_time = str(datetime.datetime.now().strftime("%Y%m%d%H%M%S"))
                 file_name = f"{it.get('FName')}-{caller_id}-{date_time}.jpg"
@@ -156,6 +160,26 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
             logger.exception(f"Не удалось получить/сохранить кадр из камеры: {ex}")
 
         return jsonify(json_replay)
+
+    @app.route('/action.update_cams', methods=['POST'])
+    def update_cameras():
+        """ Даём команду RTSP серверу на обновления списка работающих камер """
+        global CAM_DICT
+        ret_value = {"RESULT": "ERROR", "DESC": '', "DATA": dict()}
+
+        try:
+            # Запрашиваем у БД список камер
+            new_cams = CamerasDB.take_cameras()
+            set_ini['CAMERAS'] = new_cams.get('DATA')
+
+            CAM_DICT = create_cams_threads(set_ini['CAMERAS'], CAM_DICT)
+
+            ret_value['RESULT'] = "SUCCESS"
+        except Exception as ex:
+            logger.exception(f"Исключение вызвало: {ex}")
+            ret_value['DESC'] = f"Исключение в работе сервиса: {ex}"
+
+        return jsonify(ret_value)
 
 
     # RUN SERVER FLASK  ------

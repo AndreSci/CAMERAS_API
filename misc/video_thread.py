@@ -7,7 +7,9 @@ from misc.logger import Logger
 
 
 TH_CAM_ERROR_LOCK = threading.Lock()
+OLD_CAM_LIST = list()
 
+logger_vt = Logger()
 
 class ThreadAccessControl:
     def __init__(self):
@@ -48,33 +50,33 @@ class ThreadVideoRTSP:
         self.FPS = 1/30
         self.FPS_MS = int(self.FPS * 1000)
 
-    def start(self, logger: Logger):
+    def start(self):
         # Если поток имеет флаг False создаем новый
         self.load_no_signal_pic()
 
         if not self.thread_is_alive:
             with self.th_do_frame_lock:
                 self.thread_is_alive = True
-                self.thread_object = threading.Thread(target=self.__start, args=[logger, ], daemon=True)
+                self.thread_object = threading.Thread(target=self.__start, args=[logger_vt, ], daemon=True)
                 self.thread_object.start()
         else:
-            logger.add_log(f"WARNING\tНе удалось запустить поток для камеры {self.cam_name} - {self.url}, "
+            logger_vt.add_log(f"WARNING\tНе удалось запустить поток для камеры {self.cam_name} - {self.url}, "
                            f"занят другим делом.")
 
     def __start(self, logger: Logger):
         """ Функция подключения и поддержки связи с камерой """
 
         while self.allow_read_cam:
+            time.sleep(1)
             self.allow_read_frame.set(False)
-            logger.add_log(f"EVENT\tThreadVideoRTSP.start()\t"
-                           f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
+            logger.event(f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
+
             capture = cv2.VideoCapture(self.url)
             capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
             if capture.isOpened():
                 self.allow_read_frame.set(True)
-                logger.add_log(f"SUCCESS\tThreadVideoRTSP.start()\t"
-                                    f"Создано подключение к {self.cam_name} - {self.url}")
+                logger.event(f"Создано подключение к {self.cam_name} - {self.url}")
 
             frame_fail_cnt = 0
 
@@ -108,8 +110,7 @@ class ThreadVideoRTSP:
 
                             # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
                             if frame_fail_cnt == 150:
-                                logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
-                                                f"{self.cam_name} - "
+                                logger.warning(f"{self.cam_name} - "
                                                f"Слишком много неудачных кадров, повторное подключение к камере.")
                                 break
                         else:
@@ -118,13 +119,13 @@ class ThreadVideoRTSP:
                     time.sleep(self.FPS)
 
             except Exception as ex:
-                logger.add_log(f"EXCEPTION\tThreadVideoRTSP.start()\t"
-                               f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
+                logger.exception(f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
 
-            logger.add_log(f"WARNING\tThreadVideoRTSP.start()\t"
-                            f"{self.cam_name} - Камера отключена: {self.url}")
+            logger.warning(f"{self.cam_name} - Камера отключена: {self.url}")
 
             capture.release()
+
+        self.thread_is_alive = False
 
     def load_no_signal_pic(self):
         """ Функция подгружает кадр с надписью NoSignal """
@@ -147,7 +148,7 @@ class ThreadVideoRTSP:
 
             return self.no_frame
 
-    def create_frame(self, logger: Logger):
+    def create_frame(self):
         """ Функция задает флаг на создание кадра """
         ret_value = True
 
@@ -157,9 +158,9 @@ class ThreadVideoRTSP:
 
         # Проверяем жив ли поток для связи с камерой
         if not self.thread_object.is_alive:
-            logger.add_log(f"ERROR\tThreadVideoRTSP.create_frame()1\t"
+            logger_vt.add_log(f"ERROR\tThreadVideoRTSP.create_frame()1\t"
                            f"Поток обработки кадров для {self.cam_name} не найден.")
-            self.start(logger)
+            self.start()
 
         # Цикл ожидает пока поток __start() изменит self.do_frame на False
         # Время ожидание 450 мс. (в среднем получение одного кадра должно быть ~30мс.)
@@ -177,13 +178,87 @@ class ThreadVideoRTSP:
 
         return ret_value
 
+    def stop(self) -> bool:
+        """ Ожидает завершения потока 2 секунды после чего отправляет ответ False """
 
-def create_cams_threads(cams_from_settings: dict, logger: Logger) -> dict:
+        try:
+            self.allow_read_cam = False
+            self.allow_read_frame.set(False)
+
+            index = 0
+
+            while self.thread_is_alive:
+                time.sleep(0.01)
+
+                if index == 200:
+                    logger_vt.warning(f"Не удалось дождаться завершения работы камеры: {self.cam_name} : {self.url} "
+                                   f"- отправлено "
+                                   f"в список старых камер")
+
+                    return False
+                index += 1
+            return True
+        except Exception as ex:
+            logger_vt.exception(f"Исключение вызвало: {ex}")
+
+        return False
+
+
+def create_cams_threads(cams_dict: dict, old_cams: dict = None) -> dict:
     """ Функция создает словарь с объектами класса ThreadVideoRTSP и запускает от их имени потоки """
-    cameras = dict()
+    global OLD_CAM_LIST
 
-    for key in cams_from_settings:
-        cameras[key] = ThreadVideoRTSP(str(key), cams_from_settings[key])
-        cameras[key].start(logger)
+    new_cams = dict()
+    res_cams = dict()
 
-    return cameras
+    del_cams = dict()
+
+    if old_cams:  # Для обновления списка камер
+
+        res_cams = old_cams.copy()
+
+        for cam in old_cams:
+            # Завершаем все камеры которых нет в списке
+            if cam not in cams_dict:
+                res_stop = res_cams[cam].stop()
+                # Если не дождался завершения работы потока
+                if not res_stop:
+                    OLD_CAM_LIST.append(res_cams[cam])
+                res_cams.pop(cam)
+
+        for cam in cams_dict:
+
+            if cam in res_cams:
+                if res_cams[cam].url != cams_dict[cam]:
+
+                    res_stop = res_cams[cam].stop()
+                    # Если не дождался завершения работы потока
+                    if not res_stop:
+                        OLD_CAM_LIST.append(res_cams[cam])
+
+                    del_cams[cam] = res_cams[cam].url
+
+                    # Удаляем камеру из общего словаря потоков камер
+                    res_cams.pop(cam)
+
+                    # Добавляем в новый словарь для дальнейшего создания потоков камер
+                    new_cams[cam] = cams_dict[cam]
+            else:
+                new_cams[cam] = cams_dict[cam]
+
+    else:
+        new_cams = cams_dict
+
+
+    # Создаем потоки для камер
+    for key in new_cams:
+        res_cams[key] = ThreadVideoRTSP(str(key), new_cams[key])
+        res_cams[key].start()
+
+    if new_cams:
+        logger_vt.event(f"Добавлены камеры: {new_cams}")
+        logger_vt.event(f"Удалены камеры: {del_cams}")
+    else:
+        logger_vt.event(f"Новых камер не обнаружено!")
+
+    return res_cams

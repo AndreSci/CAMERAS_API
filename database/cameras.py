@@ -62,11 +62,9 @@ class CamerasDB:
             with connection.cursor() as cur:
                 # Получаем список камер с которых нужно получить кадры
                 cur.execute(f"select tcamera.FName, tcamera.FRTSP "
-                            f"from vig_sender.tasteriskcaller, vig_sender.tasteriskcamgroup, "
-                            f"vig_sender.tcameragroups, vig_sender.tcamera "
+                            f"from vig_sender.tasteriskcaller, vig_sender.tcameragroups, vig_sender.tcamera "
                             f"where tasteriskcaller.FName = %s "
-                            f"and tasteriskcaller.FID = tasteriskcamgroup.FAsteriskID "
-                            f"and tcameragroups.FAsteriskCamGroupID = tasteriskcamgroup.FID "
+                            f"and tcameragroups.FAsteriskCallerID = tasteriskcaller.FID "
                             f"and tcamera.FID = tcameragroups.FCameraID", (str(caller_id), ))
 
                 res = cur.fetchall()
