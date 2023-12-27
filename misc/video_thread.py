@@ -204,56 +204,55 @@ class ThreadVideoRTSP:
         return False
 
 
-def create_cams_threads(cams_dict: dict, old_cams: dict = None) -> dict:
+def create_cams_threads(new_cams_db: dict, old_cams: dict = None) -> dict:
     """ Функция создает словарь с объектами класса ThreadVideoRTSP и запускает от их имени потоки """
     global OLD_CAM_LIST
 
     new_cams = dict()
-    res_cams = dict()
+    copy_old_cams = dict()
 
     del_cams = dict()
 
     if old_cams:  # Для обновления списка камер
 
-        res_cams = old_cams.copy()
+        copy_old_cams = old_cams.copy()
 
         for cam in old_cams:
             # Завершаем все камеры которых нет в списке
-            if cam not in cams_dict:
-                res_stop = res_cams[cam].stop()
+            if cam not in new_cams_db:
+                res_stop = copy_old_cams[cam].stop()
                 # Если не дождался завершения работы потока
                 if not res_stop:
-                    OLD_CAM_LIST.append(res_cams[cam])
-                res_cams.pop(cam)
+                    OLD_CAM_LIST.append(copy_old_cams[cam])
+                copy_old_cams.pop(cam)
 
-        for cam in cams_dict:
+        for cam in new_cams_db:
+            if cam in copy_old_cams:
+                if copy_old_cams[cam].url != new_cams_db[cam]:
 
-            if cam in res_cams:
-                if res_cams[cam].url != cams_dict[cam]:
-
-                    res_stop = res_cams[cam].stop()
+                    res_stop = copy_old_cams[cam].stop()
                     # Если не дождался завершения работы потока
                     if not res_stop:
-                        OLD_CAM_LIST.append(res_cams[cam])
+                        OLD_CAM_LIST.append(copy_old_cams[cam])
 
-                    del_cams[cam] = res_cams[cam].url
+                    del_cams[cam] = copy_old_cams[cam].url
 
                     # Удаляем камеру из общего словаря потоков камер
-                    res_cams.pop(cam)
+                    copy_old_cams.pop(cam)
 
                     # Добавляем в новый словарь для дальнейшего создания потоков камер
-                    new_cams[cam] = cams_dict[cam]
+                    new_cams[cam] = new_cams_db[cam]
             else:
-                new_cams[cam] = cams_dict[cam]
+                new_cams[cam] = new_cams_db[cam]
 
     else:
-        new_cams = cams_dict
+        new_cams = new_cams_db
 
 
     # Создаем потоки для камер
     for key in new_cams:
-        res_cams[key] = ThreadVideoRTSP(str(key), new_cams[key])
-        res_cams[key].start()
+        copy_old_cams[key] = ThreadVideoRTSP(str(key), new_cams[key])
+        copy_old_cams[key].start()
 
     if new_cams:
         logger_vt.event(f"Добавлены камеры: {new_cams}")
@@ -261,4 +260,4 @@ def create_cams_threads(cams_dict: dict, old_cams: dict = None) -> dict:
     else:
         logger_vt.event(f"Новых камер не обнаружено!")
 
-    return res_cams
+    return copy_old_cams
