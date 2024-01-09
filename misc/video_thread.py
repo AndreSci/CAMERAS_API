@@ -1,3 +1,5 @@
+# Стабильно работает с 10 камерами если в настройках камеры стоит частота кадров 14
+# Stable work with 10 cameras when cameras settings set FPS = 14
 import time
 import copy
 import cv2
@@ -8,8 +10,10 @@ from misc.logger import Logger
 
 TH_CAM_ERROR_LOCK = threading.Lock()
 OLD_CAM_LIST = list()
-
 logger_vt = Logger()
+
+cv2.CAP_PROP_BUFFERSIZE = 4
+cv2.CAP_PROP_FPS = 14
 
 class ThreadAccessControl:
     def __init__(self):
@@ -72,7 +76,8 @@ class ThreadVideoRTSP:
             logger.event(f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
 
             capture = cv2.VideoCapture(self.url)
-            capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+            capture.set(cv2.CAP_PROP_BUFFERSIZE, 4)
+
 
             if capture.isOpened():
                 self.allow_read_frame.set(True)
@@ -87,7 +92,7 @@ class ThreadVideoRTSP:
                         ret, frame = capture.read()  # читать всегда кадр
                         # cv2.imshow(self.cam_name, frame)
                         # cv2.waitKey(20)
-
+                        time.sleep(0.01)
                         if self.do_frame.get() and ret:
                             # Начинаем сохранять кадр
                             frame_fail_cnt = 0
@@ -210,40 +215,15 @@ def create_cams_threads(new_cams_db: dict, old_cams: dict = None) -> dict:
 
     new_cams = dict()
     copy_old_cams = dict()
-
     del_cams = dict()
 
     if old_cams:  # Для обновления списка камер
 
         copy_old_cams = old_cams.copy()
 
-        for cam in old_cams:
-            # Завершаем все камеры которых нет в списке
-            if cam not in new_cams_db:
-                res_stop = copy_old_cams[cam].stop()
-                # Если не дождался завершения работы потока
-                if not res_stop:
-                    OLD_CAM_LIST.append(copy_old_cams[cam])
-                copy_old_cams.pop(cam)
+        del_old_cams(copy_old_cams, new_cams_db, old_cams)
 
-        for cam in new_cams_db:
-            if cam in copy_old_cams:
-                if copy_old_cams[cam].url != new_cams_db[cam]:
-
-                    res_stop = copy_old_cams[cam].stop()
-                    # Если не дождался завершения работы потока
-                    if not res_stop:
-                        OLD_CAM_LIST.append(copy_old_cams[cam])
-
-                    del_cams[cam] = copy_old_cams[cam].url
-
-                    # Удаляем камеру из общего словаря потоков камер
-                    copy_old_cams.pop(cam)
-
-                    # Добавляем в новый словарь для дальнейшего создания потоков камер
-                    new_cams[cam] = new_cams_db[cam]
-            else:
-                new_cams[cam] = new_cams_db[cam]
+        compare_cams(copy_old_cams, del_cams, new_cams, new_cams_db)
 
     else:
         new_cams = new_cams_db
@@ -261,3 +241,42 @@ def create_cams_threads(new_cams_db: dict, old_cams: dict = None) -> dict:
         logger_vt.event(f"Новых камер не обнаружено!")
 
     return copy_old_cams
+
+
+def compare_cams(copy_old_cams, del_cams, new_cams, new_cams_db):
+    """ Сравниваем камеры по параметрам, если изменился адрес к камере, отключаем камеру """
+    global OLD_CAM_LIST
+
+    for cam in new_cams_db:
+        if cam in copy_old_cams:
+            # Сравниваем url камер и останавливаем камеры если они отличаются
+            if copy_old_cams[cam].url != new_cams_db[cam]:
+
+                res_stop = copy_old_cams[cam].stop()
+                # Если не дождался завершения работы потока
+                if not res_stop:
+                    OLD_CAM_LIST.append(copy_old_cams[cam])
+
+                del_cams[cam] = copy_old_cams[cam].url
+
+                # Удаляем камеру из общего словаря потоков камер
+                copy_old_cams.pop(cam)
+
+                # Добавляем в новый словарь для дальнейшего создания потоков камер
+                new_cams[cam] = new_cams_db[cam]
+        else:
+            new_cams[cam] = new_cams_db[cam]
+
+
+def del_old_cams(copy_old_cams, new_cams_db, old_cams):
+    """ Отключаем все камеры которых нет в новом списке """
+    global OLD_CAM_LIST
+
+    for cam in old_cams:
+        # Завершаем все камеры которых нет в списке
+        if cam not in new_cams_db:
+            res_stop = copy_old_cams[cam].stop()
+            # Если не дождался завершения работы потока
+            if not res_stop:
+                OLD_CAM_LIST.append(copy_old_cams[cam])
+            copy_old_cams.pop(cam)
