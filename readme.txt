@@ -11,6 +11,9 @@
 получить кадр (CAM:3 где 3 это номер камеры)
 127.0.0.1:80/action.do?version=4.9.4&video_in=CAM:3&command=frame.video
 
+создание события с кадром
+127.0.0.1:80/action.save?caller_id=205&answer_id=108
+
 Библиотеки которые нужно подгрузить
 
 OpenCV версия

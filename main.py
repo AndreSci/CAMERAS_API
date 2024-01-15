@@ -1,5 +1,5 @@
 from misc.video_thread import create_cams_threads, ThreadVideoRTSP
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, make_response
 import datetime
 
 from misc.logger import Logger
@@ -17,6 +17,7 @@ ERROR_ON_SERVER = 'server_error'
 
 CAM_DICT = dict()
 OLD_CAM_LIST = list()
+REQUEST_DICT = {"RESULT": "ERROR", "STATUS_CODE": 400, "DESC": '', "DATA": dict()}
 
 
 def web_flask(logger: Logger, settings_ini: SettingsIni):
@@ -49,7 +50,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
     @app.route('/DoAddIp', methods=['POST'])
     def add_ip():
-        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": ""}
+        json_replay = REQUEST_DICT
 
         user_ip = request.remote_addr
         # logger.add_log(f"EVENT\tDoAddIp\tзапрос от ip: {user_ip}")
@@ -67,6 +68,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
                 allow_ip.add_ip(new_ip, logger, activity)
 
                 json_replay["RESULT"] = "SUCCESS"
+                json_replay['STATUS_CODE'] = 200
                 json_replay["DESC"] = f"IP - {new_ip} добавлен с доступом {activity}"
             else:
                 logger.add_log(f"ERROR\tDoCreateGuest\tНе удалось прочитать Json из request")
@@ -78,7 +80,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     def take_frame():
         """ Запрашиваем у потока последний кадр """
 
-        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": ""}
+        json_replay = REQUEST_DICT
 
         user_ip = request.remote_addr
 
@@ -111,7 +113,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     def save_frame_asterisk():
         """ Запрашиваем у потока последний кадр и сохраняем его в папку согласно настройкам settings.ini """
 
-        json_replay = {"RESULT": "ERROR", "DESC": "", "DATA": list()}
+        ret_value = {"RESULT": "ERROR", "STATUS_CODE": 400, "DESC": "", "DATA": list()}
 
         user_ip = request.remote_addr
 
@@ -150,16 +152,17 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
                 db_add = EventDB.add_photo(caller_id, answer_id, it.get('FName'), file_name)
 
                 if db_add:
-                    json_replay['DATA'].append({"file_name": file_name})
-                    json_replay["RESULT"] = "SUCCESS"
+                    ret_value['DATA'].append({"file_name": file_name})
+                    ret_value["RESULT"] = "SUCCESS"
+                    ret_value['STATUS_CODE'] = 200
                 else:
                     logger.warning(f"Не удалось внести данные в БД: {res_request}")
-                    json_replay['DESC'] = json_replay['DESC'] + f"Не удалось внести данные в БД: {file_name}."
+                    ret_value['DESC'] = ret_value['DESC'] + f"Не удалось внести данные в БД: {file_name}."
 
         except Exception as ex:
             logger.exception(f"Не удалось получить/сохранить кадр из камеры: {ex}")
 
-        return jsonify(json_replay)
+        return make_response(jsonify(ret_value), ret_value['STATUS_CODE'])
 
     @app.route('/action.update_cams', methods=['POST'])
     def update_cameras():
