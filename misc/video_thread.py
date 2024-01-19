@@ -92,7 +92,6 @@ class ThreadVideoRTSP:
                         ret, frame = capture.read()  # читать всегда кадр
                         # cv2.imshow(self.cam_name, frame)
                         # cv2.waitKey(20)
-                        time.sleep(0.01)
                         if self.do_frame.get() and ret:
                             # Начинаем сохранять кадр
                             frame_fail_cnt = 0
@@ -121,7 +120,8 @@ class ThreadVideoRTSP:
                         else:
                             frame_fail_cnt = 0
 
-                    time.sleep(self.FPS)
+                    # TODO продолжаем тестировать воздействие time.sleep на получение кадров
+                    time.sleep(0.0005)
 
             except Exception as ex:
                 logger.exception(f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")

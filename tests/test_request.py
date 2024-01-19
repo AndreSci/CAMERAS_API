@@ -1,8 +1,6 @@
 #!/usr/bin/python3.11
 
 import requests
-import sys
-from misc.logger import Logger
 
 # Адрес и порта расположения RTSP server
 HOST = "192.168.15.10"
@@ -10,8 +8,6 @@ PORT = 8093
 
 LOG_PATH = None  # Возможно указать путь в строке - пример: "/home/asterisk/logs/"
 # (предварительно требуется создание полного пути)
-
-logger = Logger(log_path=LOG_PATH)
 
 def do_request(caller_id, answer_id) -> dict:
     """ Функция отправляет запрос на RTSP сервер """
