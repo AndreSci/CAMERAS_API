@@ -12,8 +12,6 @@ TH_CAM_ERROR_LOCK = threading.Lock()
 OLD_CAM_LIST = list()
 logger_vt = Logger()
 
-cv2.CAP_PROP_BUFFERSIZE = 4
-cv2.CAP_PROP_FPS = 14
 
 class ThreadAccessControl:
     def __init__(self):
@@ -76,7 +74,10 @@ class ThreadVideoRTSP:
             logger.event(f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
 
             capture = cv2.VideoCapture(self.url)
+            # capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+            # capture.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
             capture.set(cv2.CAP_PROP_BUFFERSIZE, 4)
+            capture.set(cv2.CAP_PROP_FPS, 14)
 
 
             if capture.isOpened():
