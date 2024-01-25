@@ -28,30 +28,6 @@ class CamerasDB:
         return ret_value
 
     @staticmethod
-    def add_camera(f_name: str, rtsp: str) -> dict:
-
-        ret_value = {"RESULT": "ERROR", "DESC": "", "DATA": {}}
-
-        try:
-            connection = connect_db()
-
-            with connection.cursor() as cur:
-                # Получаем список камер
-                cur.execute("select FName, FRTSP from vig_sender.tcamera")
-
-                connection.commit()
-
-                res = cur.rowcount
-
-                if res > 0:
-                    ret_value['RESULT'] = "SUCCESS"
-
-        except Exception as ex:
-            ret_value["DESC"] = f"Исключение вызвало: {ex}"
-
-        return ret_value
-
-    @staticmethod
     def find_camera(caller_id: str) -> dict:
 
         ret_value = {"RESULT": "ERROR", "DESC": "", "DATA": {}}

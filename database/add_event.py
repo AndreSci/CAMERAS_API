@@ -9,7 +9,7 @@ class EventDB:
 
     @staticmethod
     def add_photo(caller_id: str, answer_id: str, cam_id: str, file_name: str) -> bool:
-
+        """ Функция создает ивент в БД с фотографией и информацией какой абонент предоставил доступ. """
         ret_value = False
 
         msg_event = f"Абонент {answer_id} предоставил доступ для {caller_id}."
