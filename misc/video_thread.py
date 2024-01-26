@@ -47,11 +47,6 @@ class ThreadVideoRTSP:
 
         self.miss_frame_index = 0
 
-        # FPS = 1/X
-        # X = desired FPS
-        self.FPS = 1/30
-        self.FPS_MS = int(self.FPS * 1000)
-
     def start(self):
         # Если поток имеет флаг False создаем новый
         self.load_no_signal_pic()
@@ -59,19 +54,19 @@ class ThreadVideoRTSP:
         if not self.thread_is_alive:
             with self.th_do_frame_lock:
                 self.thread_is_alive = True
-                self.thread_object = threading.Thread(target=self.__start, args=[logger_vt, ], daemon=True)
+                self.thread_object = threading.Thread(target=self.__start, daemon=True)
                 self.thread_object.start()
         else:
             logger_vt.add_log(f"WARNING\tНе удалось запустить поток для камеры {self.cam_name} - {self.url}, "
                            f"занят другим делом.")
 
-    def __start(self, logger: Logger):
+    def __start(self):
         """ Функция подключения и поддержки связи с камерой """
 
         while self.allow_read_cam:
             time.sleep(1)
             self.allow_read_frame.set(False)
-            logger.event(f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
+            logger_vt.event(f"Попытка подключиться к камере: {self.cam_name} - {self.url}")
 
             capture = cv2.VideoCapture(self.url)
             # capture.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
@@ -82,7 +77,7 @@ class ThreadVideoRTSP:
 
             if capture.isOpened():
                 self.allow_read_frame.set(True)
-                logger.event(f"Создано подключение к {self.cam_name} - {self.url}")
+                logger_vt.event(f"Создано подключение к {self.cam_name} - {self.url}")
 
             frame_fail_cnt = 0
 
@@ -92,12 +87,10 @@ class ThreadVideoRTSP:
                     if capture.isOpened():
                         ret, frame = capture.read()  # читать всегда кадр
                         # cv2.imshow(self.cam_name, frame)
-                        # cv2.waitKey(20)
+                        # cv2.waitKey(1)
                         if self.do_frame.get() and ret:
                             # Начинаем сохранять кадр
                             frame_fail_cnt = 0
-
-                            # cv2.imwrite(self.url_frame, frame)
 
                             ret_jpg, frame_jpg = cv2.imencode('.jpg', frame)
 
@@ -116,19 +109,16 @@ class ThreadVideoRTSP:
 
                             # Если много неудачных кадров останавливаем поток и пытаемся переподключить камеру
                             if frame_fail_cnt == 150:
-                                logger.warning(f"{self.cam_name} - "
+                                logger_vt.warning(f"{self.cam_name} - "
                                                f"Слишком много неудачных кадров, повторное подключение к камере.")
                                 break
                         else:
                             frame_fail_cnt = 0
 
-                    # TODO продолжаем тестировать воздействие time.sleep на получение кадров
-                    time.sleep(0.0005)
-
             except Exception as ex:
-                logger.exception(f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
+                logger_vt.exception(f"Исключение вызвала ошибка в работе с видео потоком для камеры {self.cam_name}: {ex}")
 
-            logger.warning(f"{self.cam_name} - Камера отключена: {self.url}")
+            logger_vt.warning(f"{self.cam_name} - Камера отключена: {self.url}")
 
             capture.release()
 

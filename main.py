@@ -36,7 +36,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
     set_ini = settings_ini.take_settings()
 
     if set_ini['cameras_from_db'] == '1':
-        res = CamerasDB.take_cameras()
+        res = CamerasDB().take_cameras()
         set_ini['CAMERAS'] = res.get('DATA')
 
     allow_ip = AllowedIP()
@@ -125,7 +125,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
         logger.event(f"Обращение к rtsp от адреса {user_ip}. Абонент {caller_id} связался с {answer_id}")
 
-        db_request_cams = CamerasDB.find_camera(caller_id)
+        db_request_cams = CamerasDB().find_camera(caller_id)
 
         if db_request_cams['RESULT'] != "SUCCESS":
             logger.error(db_request_cams)
@@ -149,7 +149,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
                 logger.event(f"Успешно создан файл: {file_name}")
 
                 # Добавляем событие в БД
-                db_add = EventDB.add_photo(caller_id, answer_id, it.get('FName'), file_name)
+                db_add = EventDB().add_photo(caller_id, answer_id, it.get('FName'), file_name)
 
                 if db_add:
                     ret_value['DATA'].append({"file_name": file_name})
@@ -172,7 +172,7 @@ def web_flask(logger: Logger, settings_ini: SettingsIni):
 
         try:
             # Запрашиваем у БД список камер
-            new_cams = CamerasDB.take_cameras()
+            new_cams = CamerasDB().take_cameras()
             set_ini['CAMERAS'] = new_cams.get('DATA')
 
             CAM_DICT = create_cams_threads(set_ini['CAMERAS'], CAM_DICT)

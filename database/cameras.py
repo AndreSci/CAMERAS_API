@@ -1,17 +1,14 @@
-from database.db_connection import connect_db
+from database.db_connection import DBConnection
 
 
-class CamerasDB:
+class CamerasDB(DBConnection):
 
-    @staticmethod
-    def take_cameras() -> dict:
+    def take_cameras(self) -> dict:
 
         ret_value = {"RESULT": "ERROR", "DESC": "", "DATA": {}}
 
         try:
-            connection = connect_db()
-
-            with connection.cursor() as cur:
+            with self.connection.cursor() as cur:
                 # Получаем список камер
                 cur.execute("select FName, FRTSP from vig_sender.tcamera")
 
@@ -27,15 +24,12 @@ class CamerasDB:
 
         return ret_value
 
-    @staticmethod
-    def find_camera(caller_id: str) -> dict:
+    def find_camera(self, caller_id: str) -> dict:
 
         ret_value = {"RESULT": "ERROR", "DESC": "", "DATA": {}}
 
         try:
-            connection = connect_db()
-
-            with connection.cursor() as cur:
+            with self.connection.cursor() as cur:
                 # Получаем список камер с которых нужно получить кадры
                 cur.execute(f"select tcamera.FName, tcamera.FRTSP "
                             f"from vig_sender.tasteriskcaller, vig_sender.tcameragroups, vig_sender.tcamera "
