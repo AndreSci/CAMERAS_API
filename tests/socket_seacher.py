@@ -42,8 +42,8 @@ def take_ports(host: str, port: int, ports_needed: int = 1) -> list[int]:
             sys.stdout.write(f"\r{str_percent} - Connected to {host} on port {index + port} is BUSY")
 
         sys.stdout.flush()
-        # 65635
-        if index == 1000 or port + index >= 65635:
+        # максимальный порт 65535
+        if index == 1000 or port + index >= 65535:
             print(f"Остановлено по достижению максимального кол-вы доступных итераций.")
             break
 
