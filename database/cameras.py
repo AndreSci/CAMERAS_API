@@ -42,6 +42,9 @@ class CamerasDB(DBConnection):
                 if len(res) > 0:
                     ret_value['DATA'] = res
                     ret_value['RESULT'] = "SUCCESS"
+                else:
+                    ret_value['DESC'] = (f"Не удалось найти камеру связанную с абонентом: {caller_id} / "
+                                         f"Could not find the camera associated with the caller.")
 
         except Exception as ex:
             ret_value["DESC"] = f"Исключение вызвало: {ex}"
