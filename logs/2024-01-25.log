@@ -1,9 +1,0 @@
-2024-01-25/16.18.44	SUCCESS	web_flask	Сервер CAM_API_Flask начал свою работу
-2024-01-25/16.18.44	EVENT	create_cams_threads	Добавлены камеры: {'CAM1': 'rtsp://admin:admin@192.168.15.70:554/live/main', 'CAM2': 'rtsp://admin:admin@192.168.15.63:554/live/main', 'CAM3': 'rtsp://admin:admin@192.168.15.64:554/live/main', 'CAM4': 'rtsp://admin:admin@192.168.15.66:554/live/main', 'CAM5': 'rtsp://admin:admin@192.168.15.67:554/live/main', 'CAM6': 'rtsp://admin:admin@192.168.15.69:554/live/main'}
-2024-01-25/16.18.44	EVENT	create_cams_threads	Удалены камеры: {}
-2024-01-25/16.18.45	EVENT	__start	Попытка подключиться к камере: CAM5 - rtsp://admin:admin@192.168.15.67:554/live/main
-2024-01-25/16.18.45	EVENT	__start	Попытка подключиться к камере: CAM1 - rtsp://admin:admin@192.168.15.70:554/live/main
-2024-01-25/16.18.45	EVENT	__start	Попытка подключиться к камере: CAM3 - rtsp://admin:admin@192.168.15.64:554/live/main
-2024-01-25/16.18.45	EVENT	__start	Попытка подключиться к камере: CAM4 - rtsp://admin:admin@192.168.15.66:554/live/main
-2024-01-25/16.18.45	EVENT	__start	Попытка подключиться к камере: CAM6 - rtsp://admin:admin@192.168.15.69:554/live/main
-2024-01-25/16.18.45	EVENT	__start	Попытка подключиться к камере: CAM2 - rtsp://admin:admin@192.168.15.63:554/live/main

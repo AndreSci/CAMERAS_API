@@ -1,9 +1,0 @@
-2023-12-25/13.47.32	SUCCESS	web_flask	Сервер CAM_API_Flask начал свою работу
-2023-12-25/13.50.22	SUCCESS	web_flask	Сервер CAM_API_Flask начал свою работу
-2023-12-25/13.50.22	EVENT	ThreadVideoRTSP.start()	Попытка подключиться к камере: CAM1 - rtsp://admin:admin@192.168.15.70:554/live/main
-2023-12-25/13.50.22	EVENT	ThreadVideoRTSP.start()	Попытка подключиться к камере: CAM2 - rtsp://admin:admin@192.168.15.63:554/live/main
-2023-12-25/13.50.22	EVENT	ThreadVideoRTSP.start()	Попытка подключиться к камере: CAM3 - rtsp://admin:admin@192.168.15.64:554/live/main
-2023-12-25/13.50.22	EVENT	ThreadVideoRTSP.start()	Попытка подключиться к камере: CAM4 - rtsp://admin:admin@192.168.15.66:554/live/main
-2023-12-25/13.50.22	EVENT	ThreadVideoRTSP.start()	Попытка подключиться к камере: CAM5 - rtsp://admin:admin@192.168.15.67:554/live/main
-2023-12-25/13.50.22	EVENT	ThreadVideoRTSP.start()	Попытка подключиться к камере: CAM6 - rtsp://admin:admin@192.168.15.69:554/live/main
-2023-12-25/13.50.22	EVENT	create_cams_threads	Добавлены камеры: {'CAM1': 'rtsp://admin:admin@192.168.15.70:554/live/main', 'CAM2': 'rtsp://admin:admin@192.168.15.63:554/live/main', 'CAM3': 'rtsp://admin:admin@192.168.15.64:554/live/main', 'CAM4': 'rtsp://admin:admin@192.168.15.66:554/live/main', 'CAM5': 'rtsp://admin:admin@192.168.15.67:554/live/main', 'CAM6': 'rtsp://admin:admin@192.168.15.69:554/live/main'}
