@@ -1,0 +1,1 @@
+REQUEST_DICT = {"RESULT": "ERROR", "STATUS_CODE": 400, "DESC": '', "DATA": dict()}
